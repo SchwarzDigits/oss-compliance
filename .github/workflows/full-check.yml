@@ -27,6 +27,24 @@ name: OSS Compliance -- Full Check
 
 on:
   workflow_call:
+    inputs:
+      pre-analyzer-script:
+        description: |
+          Optional path (relative to repo root) to a bash script run before
+          the ORT analyzer. Use this to prepare repo-specific dependencies
+          such as Gradle composite builds that expect sibling directories
+          on disk. The script is run with the repository root as cwd.
+        required: false
+        type: string
+        default: ''
+    secrets:
+      SIBLING_REPO_TOKEN:
+        description: |
+          Optional PAT for the pre-analyzer-script to clone sibling
+          repositories. Exposed to the script as $SIBLING_REPO_TOKEN.
+          Required only if the sibling repos are private and not
+          accessible with the default GITHUB_TOKEN.
+        required: false
 
 permissions:
   contents: read
@@ -267,6 +285,25 @@ jobs:
             echo "Injected central .ort.yml:"
             cat .ort.yml
           fi
+
+      - name: Run pre-analyzer preparation
+        # Optional repo-specific preparation step. Used to set up things ORT
+        # cannot discover on its own -- e.g. cloning sibling repositories for
+        # Gradle composite builds, or preparing on-disk artifacts that the
+        # analyzer needs. The script runs with the repository root as cwd.
+        if: inputs.pre-analyzer-script != ''
+        env:
+          SIBLING_REPO_TOKEN: ${{ secrets.SIBLING_REPO_TOKEN || github.token }}
+        run: |
+          set -euo pipefail
+          SCRIPT="${{ inputs.pre-analyzer-script }}"
+          if [ ! -f "${SCRIPT}" ]; then
+            echo "::error::pre-analyzer-script not found: ${SCRIPT}"
+            exit 1
+          fi
+          chmod +x "${SCRIPT}"
+          echo "Running pre-analyzer preparation script: ${SCRIPT}"
+          "./${SCRIPT}"
 
       - name: Run ORT
         uses: oss-review-toolkit/ort-ci-github-action@main
