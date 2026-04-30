@@ -4,11 +4,6 @@
 #
 # Reference: https://github.com/oss-review-toolkit/ort/blob/main/model/src/main/resources/reference.yml
 #
-# Note: The choice of which scanner to use (Askalono vs ScanCode etc.) is
-# NOT configured here, but via CLI arguments in the workflow file
-# (ort-cli-scan-args). This file only carries options that ORT reads
-# during configuration loading.
-#
 # Changes to this file require review by the OSS Committee.
 
 ort:
@@ -25,3 +20,8 @@ ort:
     # Skip scanning of packages where the license is already concluded
     # (e.g., via curations). Saves time on previously reviewed packages.
     skipConcluded: true
+    # Register Askalono as the scanner. By only listing Askalono here
+    # (and not ScanCode), we expect ORT to load and use Askalono only.
+    # Reference: https://oss-review-toolkit.org/ort/docs/plugins/scanners/askalono
+    scanners:
+      Askalono: {}
