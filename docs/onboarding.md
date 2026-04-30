@@ -22,6 +22,8 @@ on:
   pull_request:
   push:
     branches: [main]
+  schedule:
+    - cron: '17 3 * * *'  # nightly at 03:17 UTC; pick a different minute per repo
   workflow_dispatch:
 
 jobs:
@@ -32,15 +34,33 @@ jobs:
 That single line under `jobs:` references our central reusable
 workflow. There is nothing else to configure for the default case.
 
+**Note on the `schedule` trigger:** GitHub recommends spreading
+scheduled workflows across the hour to avoid load spikes. Pick a
+unique minute (between 0 and 59) for your repository. The hour
+should remain `3` (03:xx UTC) so all our compliance runs cluster in
+the same time window for easier monitoring.
+
 ## Step 2: Verify the workflow runs
 
 Open a pull request (or trigger the workflow manually from the Actions
 tab) and confirm that the `Compliance` job runs successfully.
 
-The workflow consists of two parallel jobs:
+The workflow is split into three jobs that follow a hybrid execution model:
 
-1. **Secret and vulnerability scan** — runs Gitleaks and Trivy. Fast (1-2 minutes).
-2. **License analysis and SBOM** — runs ORT. Slower (5-10 minutes for typical repositories).
+1. **Secret and vulnerability scan** — runs on every trigger (PR, push,
+   schedule, manual). Fast (1-2 minutes).
+2. **Decide if ORT runs** — a small job that checks whether the
+   license analysis is needed for this run. It returns true on
+   schedule/manual triggers, and on PR/push only when a dependency
+   manifest changed (go.mod, package.json, pom.xml, etc.).
+3. **License analysis and SBOM** — runs ORT, but only when the
+   previous job decided it should. Slower (5-10 minutes).
+
+**This means:** Most PRs that only change source code will skip the
+license analysis entirely and complete in 1-2 minutes. PRs that
+change dependencies will get the full check. The nightly run always
+performs the full check, so we have a daily safety net regardless of
+PR activity.
 
 If a job fails on the first run, read the section
 ["What the checks do"](#what-the-checks-do) below to understand which
@@ -153,9 +173,13 @@ discuss it case by case and update the central policy if appropriate.
 - The license analysis runs on Linux runners. Repositories that need
   to build on macOS or Windows can run the central workflow alongside
   their own platform-specific CI.
-- The license analysis takes 5-10 minutes, considerably longer than
-  the secret and vulnerability scan. The two jobs run in parallel, so
-  the overall workflow runtime is dominated by ORT.
+- The license analysis takes 5-10 minutes when it runs. To keep PR
+  feedback fast, ORT only runs when a dependency manifest changed in
+  the PR or push, plus once nightly regardless. Most PRs see the
+  workflow complete in 1-2 minutes (Trivy and Gitleaks only).
+- The nightly schedule produces a daily SBOM, License-Report, and
+  Compliance status as workflow artifacts. The OSS Committee monitors
+  these centrally.
 
 ## Getting help
 

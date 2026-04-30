@@ -8,6 +8,16 @@ name: OSS Compliance — Full Check
 #     compliance:
 #       uses: SchwarzDigits/oss-compliance/.github/workflows/full-check.yml@v1
 #
+# Execution model (hybrid):
+#   - Secret scan and vulnerability scan : always run, on every trigger
+#   - License analysis and SBOM (ORT)    : runs on schedule (nightly) and
+#                                          on push/pull_request only when
+#                                          dependency manifests changed
+#
+# This keeps PRs fast (1-2 minutes for the typical source-code change)
+# while ensuring license compliance is checked whenever dependencies
+# change AND on a daily basis regardless.
+#
 # Tools used:
 #   - Gitleaks  : secret scanning across full git history
 #   - Trivy     : vulnerability scanning (CVEs)
@@ -31,6 +41,10 @@ env:
   ORT_CONFIG_REF: "v1"
 
 jobs:
+  # ---------------------------------------------------------------------
+  # Job 1: Secret and vulnerability scan
+  # Runs on every trigger (PR, push, schedule, manual).
+  # ---------------------------------------------------------------------
   secret-and-vuln-scan:
     name: Secret and vulnerability scan
     runs-on: ubuntu-latest
@@ -107,8 +121,118 @@ jobs:
             gitleaks-report.sarif
           retention-days: 30
 
+  # ---------------------------------------------------------------------
+  # Job 2: Decide whether ORT (license + SBOM) needs to run
+  # On schedule and workflow_dispatch: always run.
+  # On pull_request and push: only if a dependency manifest changed.
+  # ---------------------------------------------------------------------
+  decide-ort:
+    name: Decide if ORT runs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run_ort: ${{ steps.decide.outputs.run_ort }}
+      reason: ${{ steps.decide.outputs.reason }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # need previous commit for diff on push events
+
+      - name: Decide
+        id: decide
+        run: |
+          set -euo pipefail
+
+          # Always run on schedule (nightly) and on manual dispatch.
+          if [ "${GITHUB_EVENT_NAME}" = "schedule" ]; then
+            echo "run_ort=true" >> "$GITHUB_OUTPUT"
+            echo "reason=scheduled run" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            echo "run_ort=true" >> "$GITHUB_OUTPUT"
+            echo "reason=manual dispatch" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # On pull_request or push, only run if a dependency manifest changed.
+          # Compute the diff base depending on event type.
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          else
+            # push event: compare against parent commit
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+          fi
+
+          # If BASE_SHA is empty or all-zero (first commit, force-push), default to running ORT.
+          if [ -z "${BASE_SHA}" ] || [ "${BASE_SHA}" = "0000000000000000000000000000000000000000" ]; then
+            echo "run_ort=true" >> "$GITHUB_OUTPUT"
+            echo "reason=no diff base available, running ORT to be safe" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Fetch base ref so we can diff against it.
+          git fetch --no-tags --prune --depth=1 origin "${BASE_SHA}" 2>/dev/null || true
+
+          # List of file patterns that, when changed, should trigger ORT.
+          # Matches dependency manifests across common ecosystems.
+          MANIFEST_PATTERNS=(
+            'go.mod' 'go.sum'
+            'package.json' 'package-lock.json' 'pnpm-lock.yaml' 'yarn.lock'
+            'pom.xml'
+            'build.gradle' 'build.gradle.kts' 'settings.gradle' 'settings.gradle.kts'
+            'gradle.lockfile'
+            'requirements.txt' 'requirements-*.txt' 'pyproject.toml' 'poetry.lock' 'Pipfile' 'Pipfile.lock'
+            'Cargo.toml' 'Cargo.lock'
+            'composer.json' 'composer.lock'
+            'Gemfile' 'Gemfile.lock'
+            '*.csproj' '*.fsproj' '*.vbproj' 'packages.config' 'paket.dependencies'
+            'mix.exs' 'mix.lock'
+          )
+
+          # Get the changed file list.
+          CHANGED=$(git diff --name-only "${BASE_SHA}" "${HEAD_SHA}" 2>/dev/null || echo "")
+          echo "Changed files in this push/PR:"
+          echo "${CHANGED}"
+          echo "---"
+
+          # Check whether any changed file matches a manifest pattern.
+          for file in ${CHANGED}; do
+            base=$(basename "${file}")
+            for pattern in "${MANIFEST_PATTERNS[@]}"; do
+              # Use shell pattern matching (case statement supports globs).
+              case "${base}" in
+                ${pattern})
+                  echo "run_ort=true" >> "$GITHUB_OUTPUT"
+                  echo "reason=dependency manifest changed: ${file}" >> "$GITHUB_OUTPUT"
+                  exit 0
+                  ;;
+              esac
+            done
+          done
+
+          # No manifest changed.
+          echo "run_ort=false" >> "$GITHUB_OUTPUT"
+          echo "reason=no dependency manifest changed" >> "$GITHUB_OUTPUT"
+
+      - name: Summary
+        run: |
+          echo "## ORT decision" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Run ORT: \`${{ steps.decide.outputs.run_ort }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Reason: ${{ steps.decide.outputs.reason }}" >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------
+  # Job 3: License analysis and SBOM (ORT)
+  # Runs only when decide-ort says so.
+  # ---------------------------------------------------------------------
   license-and-sbom:
     name: License analysis and SBOM
+    needs: decide-ort
+    if: needs.decide-ort.outputs.run_ort == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -126,8 +250,7 @@ jobs:
         # without requiring per-repo configuration.
         #
         # If the project already has its own .ort.yml, we do not overwrite
-        # it — that would silently break repositories that have a legitimate
-        # need for project-specific excludes. Instead we warn.
+        # it — the local file takes precedence as an emergency override.
         run: |
           set -euo pipefail
           if [ -f .ort.yml ]; then
