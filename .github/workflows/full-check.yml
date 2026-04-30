@@ -1,0 +1,172 @@
+name: OSS Compliance — Full Check
+
+# Reusable workflow that performs the standard compliance checks for
+# Schwarz Digits open-source repositories.
+#
+# Consumed via:
+#   jobs:
+#     compliance:
+#       uses: SchwarzDigits/oss-compliance/.github/workflows/full-check.yml@v1
+#
+# See docs/onboarding.md in this repository for integration guidance.
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  TRIVY_VERSION: "0.70.0"
+  GITLEAKS_VERSION: "8.21.2"
+  SYFT_VERSION: "1.18.1"
+  VULN_SEVERITY_FAIL: "CRITICAL"
+  VULN_SEVERITY_WARN: "HIGH"
+
+jobs:
+  compliance:
+    name: OSS compliance checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history for gitleaks
+
+      - name: Install Trivy
+        run: |
+          set -euo pipefail
+          VERSION="${TRIVY_VERSION}"
+          curl -sSfL "https://github.com/aquasecurity/trivy/releases/download/v${VERSION}/trivy_${VERSION}_Linux-64bit.tar.gz" \
+            | tar -xz -C /tmp trivy
+          sudo mv /tmp/trivy /usr/local/bin/trivy
+          trivy --version
+
+      - name: Install Gitleaks
+        run: |
+          set -euo pipefail
+          VERSION="${GITLEAKS_VERSION}"
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz" \
+            | tar -xz -C /tmp gitleaks
+          sudo mv /tmp/gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: Install Syft
+        run: |
+          set -euo pipefail
+          VERSION="${SYFT_VERSION}"
+          curl -sSfL "https://github.com/anchore/syft/releases/download/v${VERSION}/syft_${VERSION}_linux_amd64.tar.gz" \
+            | tar -xz -C /tmp syft
+          sudo mv /tmp/syft /usr/local/bin/syft
+          syft version
+
+      - name: Fetch central denylist
+        run: |
+          set -euo pipefail
+          curl -sSfL -o /tmp/denylist.yaml \
+            "https://raw.githubusercontent.com/SchwarzDigits/oss-compliance/v1/policies/denylist.yaml"
+          echo "Loaded denylist:"
+          cat /tmp/denylist.yaml
+
+      - name: Secret scan (Gitleaks)
+        run: |
+          set -euo pipefail
+          gitleaks detect \
+            --source . \
+            --redact \
+            --no-banner \
+            --exit-code 1 \
+            --report-format sarif \
+            --report-path gitleaks-report.sarif
+
+      - name: License scan (Trivy)
+        run: |
+          set -euo pipefail
+          # Build the forbidden license list from the denylist file.
+          FORBIDDEN=$(awk '/^forbidden:/ {flag=1; next} flag && /^- / {sub(/^- */, ""); print}' /tmp/denylist.yaml | paste -sd, -)
+          echo "Forbidden licenses: ${FORBIDDEN}"
+
+          trivy fs \
+            --scanners license \
+            --license-full \
+            --severity-source ghsa \
+            --format json \
+            --output trivy-license-report.json \
+            .
+
+          # Fail the build if any forbidden license is detected.
+          python3 - <<EOF
+          import json, sys
+          with open("trivy-license-report.json") as f:
+              report = json.load(f)
+          forbidden = set(filter(None, "${FORBIDDEN}".split(",")))
+          findings = []
+          for result in report.get("Results", []):
+              for lic in result.get("Licenses", []):
+                  name = lic.get("Name", "")
+                  if name in forbidden:
+                      findings.append((result.get("Target", "?"), name, lic.get("PkgName", "?")))
+          if findings:
+              print("FORBIDDEN LICENSES DETECTED:")
+              for target, name, pkg in findings:
+                  print(f"  - {pkg} ({name}) in {target}")
+              sys.exit(1)
+          print("No forbidden licenses found.")
+          EOF
+
+      - name: Vulnerability scan (Trivy)
+        run: |
+          set -euo pipefail
+          # Critical severities fail the build, high severities are reported as warning.
+          # We run two scans: a fail-on-critical run and a warning-only run.
+
+          echo "::group::Critical vulnerability scan (build-breaking)"
+          trivy fs \
+            --scanners vuln \
+            --severity "${VULN_SEVERITY_FAIL}" \
+            --exit-code 1 \
+            --ignore-unfixed \
+            --format table \
+            .
+          echo "::endgroup::"
+
+          echo "::group::High vulnerability scan (warnings only)"
+          trivy fs \
+            --scanners vuln \
+            --severity "${VULN_SEVERITY_WARN}" \
+            --exit-code 0 \
+            --ignore-unfixed \
+            --format table \
+            .
+          echo "::endgroup::"
+
+      - name: Generate SBOM
+        run: |
+          set -euo pipefail
+          syft . \
+            --output spdx-json=sbom.spdx.json \
+            --output cyclonedx-json=sbom.cyclonedx.json
+          echo "SBOM generated."
+          ls -la sbom.*.json
+
+      - name: Upload SBOM artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ github.run_id }}
+          path: |
+            sbom.spdx.json
+            sbom.cyclonedx.json
+          retention-days: 90
+
+      - name: Upload scan reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compliance-reports-${{ github.run_id }}
+          path: |
+            gitleaks-report.sarif
+            trivy-license-report.json
+          retention-days: 30
