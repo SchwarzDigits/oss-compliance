@@ -269,6 +269,11 @@ jobs:
           ort-config-revision: ${{ env.ORT_CONFIG_REF }}
           allow-dynamic-versions: 'true'
           fail-on: 'violations'
+          # Override the default scanner (ScanCode, slow) with Askalono
+          # (fast, Rust-based, sufficient for license file detection).
+          # See policies/config.yml in this repo for non-scanner-selection
+          # ORT options.
+          ort-cli-scan-args: '-P ort.scanner.scanners.project=Askalono -P ort.scanner.scanners.package=Askalono'
           run: >
             cache-dependencies,
             analyzer,
