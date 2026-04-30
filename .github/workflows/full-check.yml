@@ -269,9 +269,11 @@ jobs:
           ort-config-revision: ${{ env.ORT_CONFIG_REF }}
           allow-dynamic-versions: 'true'
           fail-on: 'violations'
-          # Scanner choice (Askalono) is configured in config.yml under
-          # scanner.scanners. See:
-          # https://oss-review-toolkit.org/ort/docs/plugins/scanners/askalono
+          # Override the default scanner (ScanCode) with Askalono.
+          # --scanners is a scan-subcommand option, so it goes into
+          # ort-cli-scan-args (placed after `scan`), not ort-cli-args
+          # (placed before the subcommand for global -P properties).
+          ort-cli-scan-args: '--scanners Askalono'
           run: >
             cache-dependencies,
             analyzer,

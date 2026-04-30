@@ -20,8 +20,3 @@ ort:
     # Skip scanning of packages where the license is already concluded
     # (e.g., via curations). Saves time on previously reviewed packages.
     skipConcluded: true
-    # Register Askalono as the scanner. By only listing Askalono here
-    # (and not ScanCode), we expect ORT to load and use Askalono only.
-    # Reference: https://oss-review-toolkit.org/ort/docs/plugins/scanners/askalono
-    scanners:
-      Askalono: {}
