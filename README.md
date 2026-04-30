@@ -32,14 +32,14 @@ Add the following workflow to your repository at
 name: Compliance
 
 on:
-  pull_request:
-  push:
-    branches: [main]
-  workflow_dispatch:
+   pull_request:
+   push:
+      branches: [main]
+   workflow_dispatch:
 
 jobs:
-  compliance:
-    uses: SchwarzDigits/oss-compliance/.github/workflows/full-check.yml@v1
+   compliance:
+      uses: SchwarzDigits/oss-compliance/.github/workflows/full-check.yml@v1
 ```
 
 That is the entire integration step. The workflow handles installation,
@@ -52,12 +52,13 @@ For more detail, see [docs/onboarding.md](docs/onboarding.md).
 ```
 .github/workflows/full-check.yml   # the reusable workflow
 .ort.yml                           # path excludes (injected into all scans)
+config.yml                         # ORT runtime configuration (scanners, etc.)
 license-classifications.yml        # license categorization (used by evaluator)
 evaluator.rules.kts                # ORT evaluator rules in Kotlin DSL
 docs/onboarding.md                 # integration guide
 ```
 
-The ORT-specific configuration files (`.ort.yml`,
+The ORT-specific configuration files (`.ort.yml`, `config.yml`,
 `license-classifications.yml`, `evaluator.rules.kts`) live in the
 repository root, because that is where ORT expects them when it pulls
 the configuration repository.

@@ -272,6 +272,7 @@ jobs:
           run: >
             cache-dependencies,
             analyzer,
+            scanner,
             evaluator,
             reporter,
             upload-results

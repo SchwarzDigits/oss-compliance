@@ -1,0 +1,43 @@
+# Schwarz Digits Open Source — ORT Configuration
+#
+# Central ORT configuration applied to every compliance run.
+# Defines which scanners and analyzers are used.
+#
+# Reference: https://oss-review-toolkit.org/ort/docs/configuration
+#
+# Changes to this file require review by the OSS Committee.
+
+ort:
+  analyzer:
+    # Don't fail the run if a package manager can't resolve dynamic versions.
+    # Some Go modules and npm packages use this; we'd rather get a partial
+    # result than no result.
+    allowDynamicVersions: true
+    # Skip analysis of paths excluded by .ort.yml. Saves time on excluded
+    # benchmark/test/example directories.
+    skipExcluded: true
+
+  scanner:
+    # Skip scanning of paths and packages excluded by .ort.yml.
+    skipExcluded: true
+    # Skip scanning of packages where the license is already concluded
+    # (e.g., via curations). Saves time on previously reviewed packages.
+    skipConcluded: true
+
+    # Use Askalono as the license detector. Askalono is a fast, Rust-based
+    # license detector developed by Amazon. It identifies SPDX licenses by
+    # comparing files against a built-in database of license texts.
+    #
+    # We deliberately do NOT use ScanCode here, even though it's more
+    # thorough, because its scan time grows linearly with repository size
+    # and our compliance workflow runs on every dependency-changing PR.
+    # Askalono is the right trade-off for our use case.
+    #
+    # If we ever need deeper analysis (e.g., source-file license headers,
+    # snippet detection), we can switch to ScanCode here without changing
+    # any other configuration.
+    scanners:
+      project:
+        - Askalono
+      package:
+        - Askalono

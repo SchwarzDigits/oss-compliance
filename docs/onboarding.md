@@ -105,11 +105,22 @@ If a critical CVE is detected:
 
 ### License analysis (ORT)
 
-ORT (OSS Review Toolkit) analyzes all dependency manifests in your
-repository, retrieves license information from the relevant package
-registries, and applies our central license classifications.
+ORT (OSS Review Toolkit) analyzes the dependency manifests in your
+repository and detects the licenses of those dependencies in two
+complementary ways:
 
-The evaluator categorizes findings as:
+1. **Manifest-based detection (Analyzer):** for ecosystems where
+   licenses are declared in package metadata (Maven, npm, PyPI,
+   Cargo, etc.), ORT reads the license directly from the manifest.
+2. **Source-based detection (Scanner with Askalono):** for every
+   dependency, ORT downloads the source and runs Askalono to
+   identify the license from the package's `LICENSE` file. This is
+   essential for ecosystems like Go, where `go.mod` does not carry
+   license metadata.
+
+The combined license information is then evaluated against our
+central license classifications. The evaluator categorizes findings
+as:
 
 - **Permissive** (Apache, MIT, BSD): always allowed, no action needed.
 - **Copyleft-limited** (LGPL, MPL): allowed with awareness.
@@ -124,6 +135,7 @@ The evaluator categorizes findings as:
 The full license classifications are defined in
 [`license-classifications.yml`](../license-classifications.yml). The
 evaluator rules are in [`evaluator.rules.kts`](../evaluator.rules.kts).
+The scanner configuration is in [`config.yml`](../config.yml).
 
 ### SBOM generation
 
@@ -173,10 +185,11 @@ discuss it case by case and update the central policy if appropriate.
 - The license analysis runs on Linux runners. Repositories that need
   to build on macOS or Windows can run the central workflow alongside
   their own platform-specific CI.
-- The license analysis takes 5-10 minutes when it runs. To keep PR
-  feedback fast, ORT only runs when a dependency manifest changed in
-  the PR or push, plus once nightly regardless. Most PRs see the
-  workflow complete in 1-2 minutes (Trivy and Gitleaks only).
+- The license analysis takes 6-12 minutes when it runs (includes
+  source download for all dependencies). To keep PR feedback fast,
+  ORT only runs when a dependency manifest changed in the PR or push,
+  plus once nightly regardless. Most PRs see the workflow complete in
+  1-2 minutes (Trivy and Gitleaks only).
 - The nightly schedule produces a daily SBOM, License-Report, and
   Compliance status as workflow artifacts. The OSS Committee monitors
   these centrally.
