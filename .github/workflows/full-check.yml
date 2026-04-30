@@ -85,23 +85,31 @@ jobs:
         run: |
           set -euo pipefail
           # Build the forbidden license list from the denylist file.
-          FORBIDDEN=$(awk '/^forbidden:/ {flag=1; next} flag && /^- / {sub(/^- */, ""); print}' /tmp/denylist.yaml | paste -sd, -)
+          # Match only top-level list entries (no leading comment, no indent).
+          FORBIDDEN=$(grep -E '^- [A-Za-z0-9._-]+' /tmp/denylist.yaml | sed 's/^- //' | paste -sd, -)
           echo "Forbidden licenses: ${FORBIDDEN}"
+
+          if [ -z "${FORBIDDEN}" ]; then
+            echo "ERROR: denylist is empty or could not be parsed."
+            cat /tmp/denylist.yaml
+            exit 1
+          fi
+
+          export FORBIDDEN
 
           trivy fs \
             --scanners license \
             --license-full \
-            --severity-source ghsa \
             --format json \
             --output trivy-license-report.json \
             .
 
           # Fail the build if any forbidden license is detected.
-          python3 - <<EOF
-          import json, sys
+          python3 - <<'EOF'
+          import json, sys, os
           with open("trivy-license-report.json") as f:
               report = json.load(f)
-          forbidden = set(filter(None, "${FORBIDDEN}".split(",")))
+          forbidden = set(filter(None, os.environ.get("FORBIDDEN", "").split(",")))
           findings = []
           for result in report.get("Results", []):
               for lic in result.get("Licenses", []):
