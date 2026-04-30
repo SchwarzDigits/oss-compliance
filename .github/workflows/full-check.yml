@@ -85,13 +85,16 @@ jobs:
         run: |
           set -euo pipefail
           # Build the forbidden license list from the denylist file.
-          # Match only top-level list entries (no leading comment, no indent).
-          FORBIDDEN=$(grep -E '^- [A-Za-z0-9._-]+' /tmp/denylist.yaml | sed 's/^- //' | paste -sd, -)
+          # Match indented list entries under `forbidden:` block.
+          # Use `|| true` so grep returning 1 (no match) does not abort the step.
+          FORBIDDEN=$(grep -E '^[[:space:]]*- [A-Za-z0-9._-]+' /tmp/denylist.yaml | sed -E 's/^[[:space:]]*- //' | paste -sd, - || true)
           echo "Forbidden licenses: ${FORBIDDEN}"
 
           if [ -z "${FORBIDDEN}" ]; then
             echo "ERROR: denylist is empty or could not be parsed."
+            echo "--- denylist.yaml content ---"
             cat /tmp/denylist.yaml
+            echo "--- end of denylist ---"
             exit 1
           fi
 
