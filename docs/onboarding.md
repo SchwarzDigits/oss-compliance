@@ -123,6 +123,14 @@ discuss it case by case and update the central policy if appropriate.
   their own platform-specific CI.
 - License detection is dependency-based, not source-file-based. License
   headers in your own source files are not enforced by this workflow.
+- The following directories are excluded from all scans, since they
+  typically contain test fixtures, benchmarks, examples, or third-party
+  vendored content that is not part of the production build:
+  `node_modules`, `testdata`, `fixtures`, `_benchmark`, `_examples`,
+  `_test`. If your repository uses other names for these purposes,
+  add a `.trivyignore` file at the repository root with paths to skip,
+  and contact the OSS Committee if SBOM exclusions are needed beyond
+  this default set.
 
 ## Getting help
 

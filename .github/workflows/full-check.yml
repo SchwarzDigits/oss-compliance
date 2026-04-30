@@ -103,6 +103,7 @@ jobs:
           trivy fs \
             --scanners license \
             --license-full \
+            --skip-dirs 'node_modules,testdata,fixtures,_benchmark,_examples,_test' \
             --format json \
             --output trivy-license-report.json \
             .
@@ -139,6 +140,7 @@ jobs:
             --severity "${VULN_SEVERITY_FAIL}" \
             --exit-code 1 \
             --ignore-unfixed \
+            --skip-dirs 'node_modules,testdata,fixtures,_benchmark,_examples,_test' \
             --format table \
             .
           echo "::endgroup::"
@@ -149,6 +151,7 @@ jobs:
             --severity "${VULN_SEVERITY_WARN}" \
             --exit-code 0 \
             --ignore-unfixed \
+            --skip-dirs 'node_modules,testdata,fixtures,_benchmark,_examples,_test' \
             --format table \
             .
           echo "::endgroup::"
@@ -157,6 +160,12 @@ jobs:
         run: |
           set -euo pipefail
           syft . \
+            --exclude './node_modules' \
+            --exclude './testdata' \
+            --exclude './fixtures' \
+            --exclude './_benchmark' \
+            --exclude './_examples' \
+            --exclude './_test' \
             --output spdx-json=sbom.spdx.json \
             --output cyclonedx-json=sbom.cyclonedx.json
           echo "SBOM generated."
