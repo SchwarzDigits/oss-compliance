@@ -19,9 +19,9 @@ permissions:
 env:
   TRIVY_VERSION: "0.70.0"
   GITLEAKS_VERSION: "8.21.2"
-  SYFT_VERSION: "1.18.1"
   VULN_SEVERITY_FAIL: "CRITICAL"
   VULN_SEVERITY_WARN: "HIGH"
+  SKIP_DIRS: "node_modules,testdata,fixtures,_benchmark,_examples,_test"
 
 jobs:
   compliance:
@@ -52,15 +52,6 @@ jobs:
             | tar -xz -C /tmp gitleaks
           sudo mv /tmp/gitleaks /usr/local/bin/gitleaks
           gitleaks version
-
-      - name: Install Syft
-        run: |
-          set -euo pipefail
-          VERSION="${SYFT_VERSION}"
-          curl -sSfL "https://github.com/anchore/syft/releases/download/v${VERSION}/syft_${VERSION}_linux_amd64.tar.gz" \
-            | tar -xz -C /tmp syft
-          sudo mv /tmp/syft /usr/local/bin/syft
-          syft version
 
       - name: Fetch central denylist
         run: |
@@ -103,7 +94,7 @@ jobs:
           trivy fs \
             --scanners license \
             --license-full \
-            --skip-dirs 'node_modules,testdata,fixtures,_benchmark,_examples,_test' \
+            --skip-dirs "${SKIP_DIRS}" \
             --format json \
             --output trivy-license-report.json \
             .
@@ -140,7 +131,7 @@ jobs:
             --severity "${VULN_SEVERITY_FAIL}" \
             --exit-code 1 \
             --ignore-unfixed \
-            --skip-dirs 'node_modules,testdata,fixtures,_benchmark,_examples,_test' \
+            --skip-dirs "${SKIP_DIRS}" \
             --format table \
             .
           echo "::endgroup::"
@@ -151,23 +142,32 @@ jobs:
             --severity "${VULN_SEVERITY_WARN}" \
             --exit-code 0 \
             --ignore-unfixed \
-            --skip-dirs 'node_modules,testdata,fixtures,_benchmark,_examples,_test' \
+            --skip-dirs "${SKIP_DIRS}" \
             --format table \
             .
           echo "::endgroup::"
 
-      - name: Generate SBOM
+      - name: Generate SBOM (Trivy)
         run: |
           set -euo pipefail
-          syft . \
-            --exclude './node_modules' \
-            --exclude './testdata' \
-            --exclude './fixtures' \
-            --exclude './_benchmark' \
-            --exclude './_examples' \
-            --exclude './_test' \
-            --output spdx-json=sbom.spdx.json \
-            --output cyclonedx-json=sbom.cyclonedx.json
+          # Generate SBOM in both SPDX and CycloneDX formats.
+          # Trivy embeds detected licenses and known vulnerabilities directly
+          # in the SBOM, providing a single auditable artefact.
+
+          trivy fs \
+            --scanners license,vuln \
+            --skip-dirs "${SKIP_DIRS}" \
+            --format spdx-json \
+            --output sbom.spdx.json \
+            .
+
+          trivy fs \
+            --scanners license,vuln \
+            --skip-dirs "${SKIP_DIRS}" \
+            --format cyclonedx \
+            --output sbom.cyclonedx.json \
+            .
+
           echo "SBOM generated."
           ls -la sbom.*.json
 
