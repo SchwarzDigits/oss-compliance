@@ -8,6 +8,11 @@ name: OSS Compliance — Full Check
 #     compliance:
 #       uses: SchwarzDigits/oss-compliance/.github/workflows/full-check.yml@v1
 #
+# Tools used:
+#   - Gitleaks  : secret scanning across full git history
+#   - Trivy     : vulnerability scanning (CVEs)
+#   - ORT       : license analysis and SBOM generation
+#
 # See docs/onboarding.md in this repository for integration guidance.
 
 on:
@@ -24,10 +29,10 @@ env:
   SKIP_DIRS: "node_modules,testdata,fixtures,_benchmark,_examples,_test"
 
 jobs:
-  compliance:
-    name: OSS compliance checks
+  secret-and-vuln-scan:
+    name: Secret and vulnerability scan
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
 
     steps:
       - name: Checkout repository
@@ -53,14 +58,6 @@ jobs:
           sudo mv /tmp/gitleaks /usr/local/bin/gitleaks
           gitleaks version
 
-      - name: Fetch central denylist
-        run: |
-          set -euo pipefail
-          curl -sSfL -o /tmp/denylist.yaml \
-            "https://raw.githubusercontent.com/SchwarzDigits/oss-compliance/v1/policies/denylist.yaml"
-          echo "Loaded denylist:"
-          cat /tmp/denylist.yaml
-
       - name: Secret scan (Gitleaks)
         run: |
           set -euo pipefail
@@ -72,58 +69,10 @@ jobs:
             --report-format sarif \
             --report-path gitleaks-report.sarif
 
-      - name: License scan (Trivy)
-        run: |
-          set -euo pipefail
-          # Build the forbidden license list from the denylist file.
-          # Match indented list entries under `forbidden:` block.
-          # Use `|| true` so grep returning 1 (no match) does not abort the step.
-          FORBIDDEN=$(grep -E '^[[:space:]]*- [A-Za-z0-9._-]+' /tmp/denylist.yaml | sed -E 's/^[[:space:]]*- //' | paste -sd, - || true)
-          echo "Forbidden licenses: ${FORBIDDEN}"
-
-          if [ -z "${FORBIDDEN}" ]; then
-            echo "ERROR: denylist is empty or could not be parsed."
-            echo "--- denylist.yaml content ---"
-            cat /tmp/denylist.yaml
-            echo "--- end of denylist ---"
-            exit 1
-          fi
-
-          export FORBIDDEN
-
-          trivy fs \
-            --scanners license \
-            --license-full \
-            --skip-dirs "${SKIP_DIRS}" \
-            --format json \
-            --output trivy-license-report.json \
-            .
-
-          # Fail the build if any forbidden license is detected.
-          python3 - <<'EOF'
-          import json, sys, os
-          with open("trivy-license-report.json") as f:
-              report = json.load(f)
-          forbidden = set(filter(None, os.environ.get("FORBIDDEN", "").split(",")))
-          findings = []
-          for result in report.get("Results", []):
-              for lic in result.get("Licenses", []):
-                  name = lic.get("Name", "")
-                  if name in forbidden:
-                      findings.append((result.get("Target", "?"), name, lic.get("PkgName", "?")))
-          if findings:
-              print("FORBIDDEN LICENSES DETECTED:")
-              for target, name, pkg in findings:
-                  print(f"  - {pkg} ({name}) in {target}")
-              sys.exit(1)
-          print("No forbidden licenses found.")
-          EOF
-
       - name: Vulnerability scan (Trivy)
         run: |
           set -euo pipefail
           # Critical severities fail the build, high severities are reported as warning.
-          # We run two scans: a fail-on-critical run and a warning-only run.
 
           echo "::group::Critical vulnerability scan (build-breaking)"
           trivy fs \
@@ -147,46 +96,45 @@ jobs:
             .
           echo "::endgroup::"
 
-      - name: Generate SBOM (Trivy)
-        run: |
-          set -euo pipefail
-          # Generate SBOM in both SPDX and CycloneDX formats.
-          # Trivy embeds detected licenses and known vulnerabilities directly
-          # in the SBOM, providing a single auditable artefact.
-
-          trivy fs \
-            --scanners license,vuln \
-            --skip-dirs "${SKIP_DIRS}" \
-            --format spdx-json \
-            --output sbom.spdx.json \
-            .
-
-          trivy fs \
-            --scanners license,vuln \
-            --skip-dirs "${SKIP_DIRS}" \
-            --format cyclonedx \
-            --output sbom.cyclonedx.json \
-            .
-
-          echo "SBOM generated."
-          ls -la sbom.*.json
-
-      - name: Upload SBOM artifact
+      - name: Upload security reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: sbom-${{ github.run_id }}
-          path: |
-            sbom.spdx.json
-            sbom.cyclonedx.json
-          retention-days: 90
-
-      - name: Upload scan reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: compliance-reports-${{ github.run_id }}
+          name: security-reports-${{ github.run_id }}
           path: |
             gitleaks-report.sarif
-            trivy-license-report.json
           retention-days: 30
+
+  license-and-sbom:
+    name: License analysis and SBOM
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Use HTTPS instead of SSH for Git cloning
+        run: git config --global url.https://github.com/.insteadOf ssh://git@github.com/
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run ORT
+        uses: oss-review-toolkit/ort-ci-github-action@main
+        with:
+          ort-config-repository: 'https://github.com/SchwarzDigits/oss-compliance'
+          allow-dynamic-versions: 'true'
+          fail-on: 'violations'
+          run: >
+            cache-dependencies,
+            analyzer,
+            evaluator,
+            reporter,
+            upload-results
+
+      - name: Upload ORT artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ort-results-${{ github.run_id }}
+          path: |
+            .ort/results/
+          retention-days: 90

@@ -1,0 +1,89 @@
+# Schwarz Digits Open Source — License Classifications
+#
+# This file classifies licenses for the OSS Review Toolkit (ORT).
+# Categories are referenced by ORT's evaluator rules (see evaluator.rules.kts).
+#
+# Categories used here:
+#   - permissive          : permissive licenses (Apache, MIT, BSD, ...)
+#   - copyleft-limited    : weak/limited copyleft (LGPL, MPL, ...)
+#   - copyleft            : strong copyleft (GPL, AGPL, ...)
+#   - forbidden           : not permitted in our open-source repositories
+#   - public-domain       : public domain or equivalent
+#   - documentation       : documentation/content licenses (CC-BY, ...)
+#
+# Changes to this file require review by the OSS Committee.
+
+categorizations:
+  # Forbidden — not allowed in any of our open-source repositories.
+  - id: "SSPL-1.0"
+    categories: ["forbidden"]
+  - id: "BUSL-1.1"
+    categories: ["forbidden"]
+  - id: "Commons-Clause"
+    categories: ["forbidden"]
+
+  # Permissive — always allowed.
+  - id: "Apache-2.0"
+    categories: ["permissive"]
+  - id: "MIT"
+    categories: ["permissive"]
+  - id: "BSD-2-Clause"
+    categories: ["permissive"]
+  - id: "BSD-3-Clause"
+    categories: ["permissive"]
+  - id: "ISC"
+    categories: ["permissive"]
+  - id: "Zlib"
+    categories: ["permissive"]
+  - id: "Unlicense"
+    categories: ["public-domain"]
+  - id: "CC0-1.0"
+    categories: ["public-domain"]
+
+  # Copyleft (limited) — allowed but require awareness.
+  - id: "LGPL-2.1-only"
+    categories: ["copyleft-limited"]
+  - id: "LGPL-2.1-or-later"
+    categories: ["copyleft-limited"]
+  - id: "LGPL-3.0-only"
+    categories: ["copyleft-limited"]
+  - id: "LGPL-3.0-or-later"
+    categories: ["copyleft-limited"]
+  - id: "MPL-2.0"
+    categories: ["copyleft-limited"]
+  - id: "EPL-2.0"
+    categories: ["copyleft-limited"]
+
+  # Copyleft (strong) — currently flagged for committee review case by case.
+  - id: "GPL-2.0-only"
+    categories: ["copyleft"]
+  - id: "GPL-2.0-or-later"
+    categories: ["copyleft"]
+  - id: "GPL-3.0-only"
+    categories: ["copyleft"]
+  - id: "GPL-3.0-or-later"
+    categories: ["copyleft"]
+  - id: "AGPL-3.0-only"
+    categories: ["copyleft"]
+  - id: "AGPL-3.0-or-later"
+    categories: ["copyleft"]
+
+  # Documentation licenses.
+  - id: "CC-BY-4.0"
+    categories: ["documentation"]
+  - id: "CC-BY-SA-4.0"
+    categories: ["documentation"]
+
+categories:
+  - name: "permissive"
+    description: "Permissive licenses with minimal obligations."
+  - name: "copyleft-limited"
+    description: "Weak or limited copyleft licenses; allowed with awareness."
+  - name: "copyleft"
+    description: "Strong copyleft licenses; require committee review."
+  - name: "forbidden"
+    description: "Not permitted in Schwarz Digits open-source repositories."
+  - name: "public-domain"
+    description: "Public domain or equivalent."
+  - name: "documentation"
+    description: "Licenses for documentation or non-software content."

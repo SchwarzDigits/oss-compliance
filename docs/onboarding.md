@@ -35,18 +35,22 @@ workflow. There is nothing else to configure for the default case.
 ## Step 2: Verify the workflow runs
 
 Open a pull request (or trigger the workflow manually from the Actions
-tab) and confirm that the `OSS compliance checks` job runs successfully.
+tab) and confirm that the `Compliance` job runs successfully.
 
-If the job fails on the first run, read the section
+The workflow consists of two parallel jobs:
+
+1. **Secret and vulnerability scan** — runs Gitleaks and Trivy. Fast (1-2 minutes).
+2. **License analysis and SBOM** — runs ORT. Slower (5-10 minutes for typical repositories).
+
+If a job fails on the first run, read the section
 ["What the checks do"](#what-the-checks-do) below to understand which
 check tripped and what is expected of you.
 
 ## Step 3: Make the workflow required (optional)
 
 To prevent unchecked code from reaching `main`, configure the
-`OSS compliance checks` status check as a required check on your
-default branch protection rule. This is only available for public
-repositories on GitHub Free.
+relevant status checks as required on your default branch protection
+rule. This is only available for public repositories on GitHub Free.
 
 ## What the checks do
 
@@ -61,21 +65,6 @@ If a secret is detected:
    in the git history and must be considered compromised.
 2. Rotate the secret immediately.
 3. Coordinate with the OSS Committee on history rewriting if needed.
-
-### License compliance
-
-Trivy scans all dependency manifests (`go.mod`, `package.json`, etc.)
-and detects each dependency's license. Findings are compared against
-the [central denylist](../policies/denylist.yaml).
-
-**Fails the build if a forbidden license is detected.**
-
-If a forbidden license is detected:
-
-1. Determine whether the dependency is required.
-2. If yes, find an alternative with a compatible license.
-3. If no acceptable alternative exists, contact the OSS Committee for
-   review. There may be exceptions, but they require explicit approval.
 
 ### Vulnerability scan (Trivy)
 
@@ -94,20 +83,42 @@ If a critical CVE is detected:
    reachable in your code path. Document the finding and contact the
    OSS Committee for guidance.
 
+### License analysis (ORT)
+
+ORT (OSS Review Toolkit) analyzes all dependency manifests in your
+repository, retrieves license information from the relevant package
+registries, and applies our central license classifications.
+
+The evaluator categorizes findings as:
+
+- **Permissive** (Apache, MIT, BSD): always allowed, no action needed.
+- **Copyleft-limited** (LGPL, MPL): allowed with awareness.
+- **Copyleft (strong)** (GPL, AGPL): produces a **warning**. Confirm
+  with the OSS Committee that the license is acceptable for your
+  repository's outbound distribution.
+- **Forbidden** (SSPL, BUSL, Commons-Clause): **fails the build**.
+  Replace the dependency or contact the OSS Committee for an exception.
+- **Unmapped**: produces an informational hint. Notify the OSS
+  Committee so the central license classifications can be extended.
+
+The full license classifications are defined in
+[`policies/license-classifications.yml`](../policies/license-classifications.yml).
+The evaluator rules are in
+[`policies/evaluator.rules.kts`](../policies/evaluator.rules.kts).
+
 ### SBOM generation
 
-A Software Bill of Materials is generated in both SPDX and CycloneDX
-formats and uploaded as a workflow artifact. SBOMs are retained for
-90 days.
-
-This step does not fail the build.
+ORT generates a Software Bill of Materials in SPDX and CycloneDX
+formats as part of its reporter step. The SBOM contains all detected
+dependencies with their license information and is uploaded as a
+workflow artifact.
 
 ## Customization
 
 The compliance workflow is intentionally not configurable. Tool
-versions, severity thresholds, and the license denylist are governed
-centrally by the OSS Committee, so that compliance standards are
-applied consistently across all repositories.
+versions, severity thresholds, license classifications, and evaluator
+rules are governed centrally by the OSS Committee, so that compliance
+standards are applied consistently across all repositories.
 
 If you have a legitimate need for an exception (e.g., a temporary
 suppression of a finding while a fix is being released, or a
@@ -118,19 +129,18 @@ discuss it case by case and update the central policy if appropriate.
 
 - The workflow does not currently include a CLA check. This will be
   added once the Schwarz Digits CLA is finalized.
-- The workflow runs only on Linux runners. Repositories that need to
-  build on macOS or Windows can run the central workflow alongside
+- The license analysis runs on Linux runners. Repositories that need
+  to build on macOS or Windows can run the central workflow alongside
   their own platform-specific CI.
-- License detection is dependency-based, not source-file-based. License
-  headers in your own source files are not enforced by this workflow.
-- The following directories are excluded from all scans, since they
-  typically contain test fixtures, benchmarks, examples, or third-party
-  vendored content that is not part of the production build:
-  `node_modules`, `testdata`, `fixtures`, `_benchmark`, `_examples`,
-  `_test`. If your repository uses other names for these purposes,
-  add a `.trivyignore` file at the repository root with paths to skip,
-  and contact the OSS Committee if SBOM exclusions are needed beyond
-  this default set.
+- The following directories are excluded from secret and vulnerability
+  scans, since they typically contain test fixtures, benchmarks,
+  examples, or third-party vendored content that is not part of the
+  production build: `node_modules`, `testdata`, `fixtures`,
+  `_benchmark`, `_examples`, `_test`. ORT applies its own scoping
+  rules based on package manager conventions.
+- The license analysis takes 5-10 minutes, considerably longer than
+  the secret and vulnerability scan. The two jobs run in parallel, so
+  the overall workflow runtime is dominated by ORT.
 
 ## Getting help
 
