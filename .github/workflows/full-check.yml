@@ -1,4 +1,4 @@
-name: OSS Compliance — Full Check
+name: OSS Compliance -- Full Check
 
 # Reusable workflow that performs the standard compliance checks for
 # Schwarz Digits open-source repositories.
@@ -139,6 +139,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 2  # need previous commit for diff on push events
+          submodules: recursive  # include submodules so manifests inside them are seen
 
       - name: Decide
         id: decide
@@ -242,6 +243,11 @@ jobs:
 
       - name: Checkout project
         uses: actions/checkout@v4
+        with:
+          submodules: recursive  # include submodules so ORT can resolve
+                                 # composite builds (Gradle includeBuild),
+                                 # vendored deps, and other submodule-based
+                                 # dependencies that the analyzer needs
 
       - name: Inject central .ort.yml
         # Pull the central .ort.yml from the oss-compliance config repo
@@ -250,7 +256,7 @@ jobs:
         # without requiring per-repo configuration.
         #
         # If the project already has its own .ort.yml, we do not overwrite
-        # it — the local file takes precedence as an emergency override.
+        # it -- the local file takes precedence as an emergency override.
         run: |
           set -euo pipefail
           if [ -f .ort.yml ]; then
