@@ -1,0 +1,32 @@
+# Schwarz Digits Open Source — ORT Repository Configuration
+#
+# This file is injected into every repository scanned by the central
+# compliance workflow. It defines path excludes that apply to all
+# Schwarz Digits open-source repositories.
+#
+# Repositories may NOT override this file. If your repository has
+# a legitimate need for additional excludes, contact the OSS Committee.
+#
+# See https://oss-review-toolkit.org/ort/docs/configuration/ort-yml
+# for the schema.
+
+excludes:
+  paths:
+    - pattern: "**/_benchmark/**"
+      reason: "TEST_OF"
+      comment: "Benchmark code, not part of the production build."
+    - pattern: "**/_examples/**"
+      reason: "EXAMPLE_OF"
+      comment: "Example code, not part of the production build."
+    - pattern: "**/_test/**"
+      reason: "TEST_OF"
+      comment: "Test code, not part of the production build."
+    - pattern: "**/testdata/**"
+      reason: "TEST_OF"
+      comment: "Test fixtures, not part of the production build."
+    - pattern: "**/fixtures/**"
+      reason: "TEST_OF"
+      comment: "Test fixtures, not part of the production build."
+    - pattern: "**/node_modules/**"
+      reason: "BUILD_TOOL_OF"
+      comment: "Vendored npm packages, will be re-resolved by the package manager."

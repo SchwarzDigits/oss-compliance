@@ -102,9 +102,8 @@ The evaluator categorizes findings as:
   Committee so the central license classifications can be extended.
 
 The full license classifications are defined in
-[`policies/license-classifications.yml`](../policies/license-classifications.yml).
-The evaluator rules are in
-[`policies/evaluator.rules.kts`](../policies/evaluator.rules.kts).
+[`license-classifications.yml`](../license-classifications.yml). The
+evaluator rules are in [`evaluator.rules.kts`](../evaluator.rules.kts).
 
 ### SBOM generation
 
@@ -113,16 +112,38 @@ formats as part of its reporter step. The SBOM contains all detected
 dependencies with their license information and is uploaded as a
 workflow artifact.
 
+## Path excludes
+
+The workflow excludes test fixtures, benchmarks, examples, and
+vendored npm packages from analysis:
+
+- `_benchmark/**`, `_examples/**`, `_test/**` (underscore-prefixed
+  conventions for non-distributed code)
+- `testdata/**`, `fixtures/**` (common test data conventions)
+- `node_modules/**` (vendored npm packages)
+
+These excludes are applied centrally via a `.ort.yml` that the
+workflow injects into every repository before ORT runs. Repositories
+do not need to maintain their own `.ort.yml`.
+
+If your repository already contains a `.ort.yml`, the workflow will
+detect this, skip the injection, and emit a warning. In this case,
+the repository's local `.ort.yml` takes precedence. We do not
+recommend doing this without consulting the OSS Committee, since the
+goal of the central configuration is consistent compliance behavior
+across all repositories.
+
 ## Customization
 
 The compliance workflow is intentionally not configurable. Tool
-versions, severity thresholds, license classifications, and evaluator
-rules are governed centrally by the OSS Committee, so that compliance
-standards are applied consistently across all repositories.
+versions, severity thresholds, license classifications, evaluator
+rules, and path excludes are governed centrally by the OSS Committee,
+so that compliance standards are applied consistently across all
+repositories.
 
 If you have a legitimate need for an exception (e.g., a temporary
 suppression of a finding while a fix is being released, or a
-project-specific path exclusion), contact the OSS Committee. We can
+project-specific path exclude), contact the OSS Committee. We can
 discuss it case by case and update the central policy if appropriate.
 
 ## Known limitations
@@ -132,12 +153,6 @@ discuss it case by case and update the central policy if appropriate.
 - The license analysis runs on Linux runners. Repositories that need
   to build on macOS or Windows can run the central workflow alongside
   their own platform-specific CI.
-- The following directories are excluded from secret and vulnerability
-  scans, since they typically contain test fixtures, benchmarks,
-  examples, or third-party vendored content that is not part of the
-  production build: `node_modules`, `testdata`, `fixtures`,
-  `_benchmark`, `_examples`, `_test`. ORT applies its own scoping
-  rules based on package manager conventions.
 - The license analysis takes 5-10 minutes, considerably longer than
   the secret and vulnerability scan. The two jobs run in parallel, so
   the overall workflow runtime is dominated by ORT.

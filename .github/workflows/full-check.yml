@@ -27,6 +27,8 @@ env:
   VULN_SEVERITY_FAIL: "CRITICAL"
   VULN_SEVERITY_WARN: "HIGH"
   SKIP_DIRS: "node_modules,testdata,fixtures,_benchmark,_examples,_test"
+  ORT_CONFIG_REPO: "https://github.com/SchwarzDigits/oss-compliance"
+  ORT_CONFIG_REF: "v1"
 
 jobs:
   secret-and-vuln-scan:
@@ -114,13 +116,34 @@ jobs:
       - name: Use HTTPS instead of SSH for Git cloning
         run: git config --global url.https://github.com/.insteadOf ssh://git@github.com/
 
-      - name: Checkout repository
+      - name: Checkout project
         uses: actions/checkout@v4
+
+      - name: Inject central .ort.yml
+        # Pull the central .ort.yml from the oss-compliance config repo
+        # into the project root before ORT runs. This applies our central
+        # path excludes (skip _benchmark, testdata, etc.) to every repository
+        # without requiring per-repo configuration.
+        #
+        # If the project already has its own .ort.yml, we do not overwrite
+        # it — that would silently break repositories that have a legitimate
+        # need for project-specific excludes. Instead we warn.
+        run: |
+          set -euo pipefail
+          if [ -f .ort.yml ]; then
+            echo "::warning::This repository already has a .ort.yml. The central excludes will not be applied. Consider removing the local file and contacting the OSS Committee for any required customization."
+          else
+            curl -sSfL -o .ort.yml \
+              "https://raw.githubusercontent.com/SchwarzDigits/oss-compliance/${ORT_CONFIG_REF}/.ort.yml"
+            echo "Injected central .ort.yml:"
+            cat .ort.yml
+          fi
 
       - name: Run ORT
         uses: oss-review-toolkit/ort-ci-github-action@main
         with:
-          ort-config-repository: 'https://github.com/SchwarzDigits/oss-compliance'
+          ort-config-repository: ${{ env.ORT_CONFIG_REPO }}
+          ort-config-revision: ${{ env.ORT_CONFIG_REF }}
           allow-dynamic-versions: 'true'
           fail-on: 'violations'
           run: >
@@ -130,11 +153,6 @@ jobs:
             reporter,
             upload-results
 
-      - name: Upload ORT artifacts
+      - name: Clean up injected .ort.yml
         if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ort-results-${{ github.run_id }}
-          path: |
-            .ort/results/
-          retention-days: 90
+        run: rm -f .ort.yml

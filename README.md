@@ -2,13 +2,13 @@
 
 Central compliance tooling for the Schwarz Digits open-source program.
 
-This repository provides a reusable GitHub Actions workflow that performs
-the standard compliance checks required for open-source repositories in
-our organizations (`SchwarzDigits`, `SchwarzIT`).
+This repository serves two purposes:
 
-It also serves as the central ORT configuration repository, hosting the
-license classifications and evaluator rules that ORT applies during the
-license analysis.
+1. **Reusable GitHub Actions workflow** for compliance checks in our
+   open-source repositories.
+2. **ORT configuration repository** containing the license
+   classifications, evaluator rules, and path excludes that ORT
+   applies during the license analysis.
 
 ## What it does
 
@@ -20,9 +20,8 @@ request and push to the default branch and performs:
 - **License analysis and SBOM generation** with ORT (OSS Review Toolkit)
 
 The license analysis applies our central license classifications and
-evaluator rules, which categorize licenses as permissive, copyleft,
-forbidden, etc. Forbidden licenses fail the build; copyleft licenses
-produce warnings for committee review.
+evaluator rules. Forbidden licenses fail the build; strong copyleft
+licenses produce warnings for committee review.
 
 ## Quick start
 
@@ -52,11 +51,16 @@ For more detail, see [docs/onboarding.md](docs/onboarding.md).
 
 ```
 .github/workflows/full-check.yml   # the reusable workflow
-policies/
-  license-classifications.yml      # license categorization
-  evaluator.rules.kts              # ORT evaluator rules in Kotlin DSL
+.ort.yml                           # path excludes (injected into all scans)
+license-classifications.yml        # license categorization (used by evaluator)
+evaluator.rules.kts                # ORT evaluator rules in Kotlin DSL
 docs/onboarding.md                 # integration guide
 ```
+
+The ORT-specific configuration files (`.ort.yml`,
+`license-classifications.yml`, `evaluator.rules.kts`) live in the
+repository root, because that is where ORT expects them when it pulls
+the configuration repository.
 
 ## Versioning
 
@@ -68,7 +72,7 @@ and patch updates are non-breaking.
 
 This repository is maintained by the Schwarz Digits Open Source
 Committee. Changes to the workflow logic, the license classifications,
-and the evaluator rules require committee review.
+the evaluator rules, and the path excludes require committee review.
 
 For questions, contact
 [opensource@digits.schwarz](mailto:opensource@digits.schwarz).
