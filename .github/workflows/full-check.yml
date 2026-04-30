@@ -271,9 +271,10 @@ jobs:
           fail-on: 'violations'
           # Override the default scanner (ScanCode, slow) with Askalono
           # (fast, Rust-based, sufficient for license file detection).
-          # See policies/config.yml in this repo for non-scanner-selection
-          # ORT options.
-          ort-cli-scan-args: '-P ort.scanner.scanners.project=Askalono -P ort.scanner.scanners.package=Askalono'
+          # These are global ORT properties (-P), so they must go to
+          # ort-cli-args (before the subcommand), not ort-cli-scan-args
+          # (which is scan subcommand args, placed after the subcommand).
+          ort-cli-args: '-P ort.scanner.scanners.project=Askalono -P ort.scanner.scanners.package=Askalono'
           run: >
             cache-dependencies,
             analyzer,
