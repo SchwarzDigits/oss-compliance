@@ -62,13 +62,13 @@ documentationLicenses
 
 - Forbidden licenses in dependencies fail the build.
 - 
-- This rule only applies to inbound dependencies (`-isProject()`), not to
-- the project itself. The project’s own license is the outbound license,
-- which is a deliberate team choice and not a compliance violation.
+- Uses `dependencyRule` (not `packageRule`) so the rule fires only on
+- inbound dependencies and ignores the project itself. The project’s
+- own license is the outbound license, which is a deliberate team
+- choice and not a compliance violation.
   */
-  fun RuleSet.forbiddenLicenseRule() = packageRule("FORBIDDEN_LICENSE_IN_DEPENDENCY") {
+  fun RuleSet.forbiddenLicenseRule() = dependencyRule("FORBIDDEN_LICENSE_IN_DEPENDENCY") {
   require {
-  -isProject()
   -isExcluded()
   }
   
@@ -93,13 +93,13 @@ documentationLicenses
 
 - Strong copyleft licenses in dependencies produce a warning for committee review.
 - 
-- This rule only applies to inbound dependencies (`-isProject()`), not to
-- the project itself. If the project itself is GPL-3.0, that is its
-- outbound license, not an incompatible inbound dependency.
+- Uses `dependencyRule` (not `packageRule`) so the rule fires only on
+- inbound dependencies and ignores the project itself. If the project
+- itself is GPL-3.0, that is its outbound license, not an incompatible
+- inbound dependency.
   */
-  fun RuleSet.copyleftLicenseRule() = packageRule("COPYLEFT_LICENSE_IN_DEPENDENCY") {
+  fun RuleSet.copyleftLicenseRule() = dependencyRule("COPYLEFT_LICENSE_IN_DEPENDENCY") {
   require {
-  -isProject()
   -isExcluded()
   }
   
@@ -125,12 +125,12 @@ documentationLicenses
 - Unclassified licenses in dependencies produce a hint so we can extend
 - the classification list.
 - 
-- Excludes projects: a project’s own license is an outbound license decision,
-- not something the central classification list needs to cover.
+- Uses `dependencyRule` (not `packageRule`) so the rule fires only on
+- inbound dependencies. A project’s own license is an outbound license
+- decision, not something the central classification list needs to cover.
   */
-  fun RuleSet.unclassifiedLicenseRule() = packageRule("UNCLASSIFIED_LICENSE") {
+  fun RuleSet.unclassifiedLicenseRule() = dependencyRule("UNCLASSIFIED_LICENSE") {
   require {
-  -isProject()
   -isExcluded()
   }
   
