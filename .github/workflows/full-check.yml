@@ -37,14 +37,6 @@ on:
         required: false
         type: string
         default: ''
-    secrets:
-      SIBLING_REPO_TOKEN:
-        description: |
-          Optional PAT for the pre-analyzer-script to clone sibling
-          repositories. Exposed to the script as $SIBLING_REPO_TOKEN.
-          Required only if the sibling repos are private and not
-          accessible with the default GITHUB_TOKEN.
-        required: false
 
 permissions:
   contents: read
@@ -292,8 +284,6 @@ jobs:
         # Gradle composite builds, or preparing on-disk artifacts that the
         # analyzer needs. The script runs with the repository root as cwd.
         if: inputs.pre-analyzer-script != ''
-        env:
-          SIBLING_REPO_TOKEN: ${{ secrets.SIBLING_REPO_TOKEN || github.token }}
         run: |
           set -euo pipefail
           SCRIPT="${{ inputs.pre-analyzer-script }}"
