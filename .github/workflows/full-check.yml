@@ -37,6 +37,22 @@ on:
         required: false
         type: string
         default: ''
+      scanner:
+        description: |
+          Whether to run the ORT scanner phase (Askalono) on top of the
+          analyzer. Values:
+            - auto     (default) run scanner if any package manager is
+                       present whose declared licenses are unreliable
+                       (Go, npm, Cargo, PyPI). Skip scanner for ecosystems
+                       with reliable POM-style declarations (Maven, Gradle,
+                       NuGet) where a source scan adds little value but
+                       takes hours and frequently fails on stale VCS refs.
+            - enabled  always run scanner regardless of detected ecosystem
+            - disabled never run scanner; rely solely on declared licenses
+                       from the analyzer
+        required: false
+        type: string
+        default: 'auto'
 
 permissions:
   contents: read
@@ -143,6 +159,8 @@ jobs:
     outputs:
       run_ort: ${{ steps.decide.outputs.run_ort }}
       reason: ${{ steps.decide.outputs.reason }}
+      run_scanner: ${{ steps.scanner.outputs.run_scanner }}
+      scanner_reason: ${{ steps.scanner.outputs.scanner_reason }}
 
     steps:
       - name: Checkout repository
@@ -230,11 +248,73 @@ jobs:
           echo "run_ort=false" >> "$GITHUB_OUTPUT"
           echo "reason=no dependency manifest changed" >> "$GITHUB_OUTPUT"
 
+      - name: Decide scanner phase
+        id: scanner
+        run: |
+          set -euo pipefail
+
+          # Honor explicit override first.
+          MODE="${{ inputs.scanner }}"
+          case "${MODE}" in
+            enabled)
+              echo "run_scanner=true" >> "$GITHUB_OUTPUT"
+              echo "scanner_reason=forced via input scanner=enabled" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+            disabled)
+              echo "run_scanner=false" >> "$GITHUB_OUTPUT"
+              echo "scanner_reason=disabled via input scanner=disabled" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+            auto)
+              ;;  # fall through to auto-detection
+            *)
+              echo "::error::Invalid value for input scanner: '${MODE}'. Allowed: auto | enabled | disabled."
+              exit 1
+              ;;
+          esac
+
+          # Auto-detection: scan if any "scan-needed" ecosystem is present.
+          # These ecosystems either don't declare licenses in metadata (Go),
+          # or declare them inconsistently (npm, Cargo, PyPI), so a source
+          # scan adds real value.
+          SCAN_NEEDED=false
+          REASON=""
+
+          # Glob-find common manifests (case-sensitive, depth-limited to
+          # avoid descending into vendored/node_modules trees).
+          # Note: -path patterns prune those directories early.
+          FIND_OUT=$(find . \
+            \( -path ./node_modules -o -path ./vendor -o -path '*/.git' \) -prune -o \
+            -type f \
+            \( -name 'go.mod' \
+               -o -name 'package.json' \
+               -o -name 'Cargo.toml' \
+               -o -name 'requirements.txt' \
+               -o -name 'pyproject.toml' \
+               -o -name 'Pipfile' \
+               -o -name 'composer.json' \
+               -o -name 'Gemfile' \
+               -o -name 'mix.exs' \
+            \) -print 2>/dev/null || true)
+
+          if [ -n "${FIND_OUT}" ]; then
+            SCAN_NEEDED=true
+            REASON="auto: found scan-relevant manifest(s): $(echo "${FIND_OUT}" | head -3 | tr '\n' ' ')"
+          else
+            REASON="auto: only POM-style ecosystems (Maven/Gradle/NuGet) detected; declared licenses are reliable, scanner skipped"
+          fi
+
+          echo "run_scanner=${SCAN_NEEDED}" >> "$GITHUB_OUTPUT"
+          echo "scanner_reason=${REASON}" >> "$GITHUB_OUTPUT"
+
       - name: Summary
         run: |
           echo "## ORT decision" >> "$GITHUB_STEP_SUMMARY"
           echo "- Run ORT: \`${{ steps.decide.outputs.run_ort }}\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- Reason: ${{ steps.decide.outputs.reason }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Run scanner: \`${{ steps.scanner.outputs.run_scanner }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Scanner reason: ${{ steps.scanner.outputs.scanner_reason }}" >> "$GITHUB_STEP_SUMMARY"
 
   # ---------------------------------------------------------------------
   # Job 3: License analysis and SBOM (ORT)
@@ -306,14 +386,15 @@ jobs:
           # --scanners is a scan-subcommand option, so it goes into
           # ort-cli-scan-args (placed after `scan`), not ort-cli-args
           # (placed before the subcommand for global -P properties).
+          # Only applied when the scanner phase actually runs; harmless
+          # when it doesn't.
           ort-cli-scan-args: '--scanners Askalono'
-          run: >
-            cache-dependencies,
-            analyzer,
-            scanner,
-            evaluator,
-            reporter,
-            upload-results
+          # The `run` argument controls which ORT phases execute. The
+          # scanner phase is included only when the decide-ort job has
+          # determined a source scan adds value (Go/npm/Cargo/etc.) or
+          # when the workflow caller explicitly requested it.
+          # See decide-ort job for the reasoning.
+          run: ${{ needs.decide-ort.outputs.run_scanner == 'true' && 'cache-dependencies, analyzer, scanner, evaluator, reporter, upload-results' || 'cache-dependencies, analyzer, evaluator, reporter, upload-results' }}
 
       - name: Clean up injected .ort.yml
         if: always()
