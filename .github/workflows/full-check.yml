@@ -377,12 +377,11 @@ jobs:
 
       - name: Run ORT
         uses: oss-review-toolkit/ort-ci-github-action@main
-        env:
-          JDK_JAVA_OPTIONS: "-Xmx12g"
         with:
           ort-config-repository: ${{ env.ORT_CONFIG_REPO }}
           ort-config-revision: ${{ env.ORT_CONFIG_REF }}
           allow-dynamic-versions: 'true'
+          docker-cli-args: '-e JDK_JAVA_OPTIONS=-Xmx12g'
           fail-on: 'violations'
           # Override the default scanner (ScanCode) with Askalono.
           # --scanners is a scan-subcommand option, so it goes into
