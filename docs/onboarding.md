@@ -26,6 +26,9 @@ on:
     - cron: '43 21 * * 0'   # weekly Sunday evening; pick a different minute per repo
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   compliance:
     uses: SchwarzDigits/oss-compliance/.github/workflows/full-check.yml@v1

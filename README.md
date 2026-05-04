@@ -38,6 +38,9 @@ on:
       - cron: '43 21 * * 0'
    workflow_dispatch:
 
+permissions:
+   contents: read
+
 jobs:
    compliance:
       uses: SchwarzDigits/oss-compliance/.github/workflows/full-check.yml@v1
