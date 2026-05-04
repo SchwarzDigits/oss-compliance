@@ -377,6 +377,8 @@ jobs:
 
       - name: Run ORT
         uses: oss-review-toolkit/ort-ci-github-action@main
+        env:
+          JDK_JAVA_OPTIONS: "-Xmx12g"
         with:
           ort-config-repository: ${{ env.ORT_CONFIG_REPO }}
           ort-config-revision: ${{ env.ORT_CONFIG_REF }}
