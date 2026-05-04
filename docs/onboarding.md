@@ -23,7 +23,7 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: '17 3 * * *'  # nightly at 03:17 UTC; pick a different minute per repo
+    - cron: '43 21 * * 0'   # weekly Sunday evening; pick a different minute per repo
   workflow_dispatch:
 
 jobs:
@@ -34,11 +34,10 @@ jobs:
 That single line under `jobs:` references our central reusable
 workflow. There is nothing else to configure for the default case.
 
-**Note on the `schedule` trigger:** GitHub recommends spreading
-scheduled workflows across the hour to avoid load spikes. Pick a
-unique minute (between 0 and 59) for your repository. The hour
-should remain `3` (03:xx UTC) so all our compliance runs cluster in
-the same time window for easier monitoring.
+**Note on the `schedule` trigger:** GitHub recommends spreading scheduled workflows
+across the hour to avoid load spikes. Pick a unique minute (between 0 and 59) for your
+repository. Keep the day (0 = Sunday) and the hour (21 UTC, ~23:00 Frankfurt CEST / ~22:00 CET)
+so all our compliance runs cluster in the same time window for easier monitoring.
 
 ## Step 2: Verify the workflow runs
 
@@ -58,7 +57,7 @@ The workflow is split into three jobs that follow a hybrid execution model:
 
 **This means:** Most PRs that only change source code will skip the
 license analysis entirely and complete in 1-2 minutes. PRs that
-change dependencies will get the full check. The nightly run always
+change dependencies will get the full check. The weekly run always
 performs the full check, so we have a daily safety net regardless of
 PR activity.
 
@@ -185,12 +184,12 @@ discuss it case by case and update the central policy if appropriate.
 - The license analysis runs on Linux runners. Repositories that need
   to build on macOS or Windows can run the central workflow alongside
   their own platform-specific CI.
-- The license analysis takes 6-12 minutes when it runs (includes
+- The license analysis takes 5-20 minutes when it runs (includes
   source download for all dependencies). To keep PR feedback fast,
   ORT only runs when a dependency manifest changed in the PR or push,
-  plus once nightly regardless. Most PRs see the workflow complete in
+  plus once weekly regardless. Most PRs see the workflow complete in
   1-2 minutes (Trivy and Gitleaks only).
-- The nightly schedule produces a daily SBOM, License-Report, and
+- The weekly schedule produces a weekly SBOM, License-Report, and
   Compliance status as workflow artifacts. The OSS Committee monitors
   these centrally.
 

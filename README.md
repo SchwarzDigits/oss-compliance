@@ -12,8 +12,8 @@ This repository serves two purposes:
 
 ## What it does
 
-When integrated into a repository, the workflow runs on every pull
-request and push to the default branch and performs:
+When integrated into a repository, the workflow runs on every pull request, every push to the default branch,
+and once weekly on Sunday evenings, performing:
 
 - **Secret scanning** with Gitleaks (full git history)
 - **Vulnerability scanning** with Trivy (critical severities fail the build, high produces warnings)
@@ -33,8 +33,9 @@ name: Compliance
 
 on:
    pull_request:
-   push:
-      branches: [main]
+   push: { branches: [main] }
+   schedule:
+      - cron: '43 21 * * 0'
    workflow_dispatch:
 
 jobs:
