@@ -39,6 +39,8 @@ categorizations:
     categories: ["public-domain"]
   - id: "CC0-1.0"
     categories: ["public-domain"]
+  - id: "LicenseRef-scancode-public-domain-disclaimer"
+    categories: ["public-domain"]
 
   # Copyleft (limited) — allowed but require awareness.
   - id: "LGPL-2.1-only"
@@ -53,6 +55,12 @@ categorizations:
     categories: ["copyleft-limited"]
   - id: "EPL-2.0"
     categories: ["copyleft-limited"]
+  - id: "MPL-1.1"
+    categories: [ "copyleft-limited" ]
+  - id: "CDDL-1.0"
+    categories: [ "copyleft-limited" ]
+  - id: "GPL-2.0-only WITH Classpath-exception-2.0"
+    categories: [ "copyleft-limited" ]
 
   # Copyleft (strong) — currently flagged for committee review case by case.
   - id: "GPL-2.0-only"
