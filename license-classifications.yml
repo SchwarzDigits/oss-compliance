@@ -35,6 +35,10 @@ categorizations:
     categories: ["permissive"]
   - id: "Zlib"
     categories: ["permissive"]
+  - id: "ICU"
+    categories: ["permissive"]
+  - id: "W3C"
+    categories: ["permissive"]
   - id: "Unlicense"
     categories: ["public-domain"]
   - id: "CC0-1.0"
@@ -52,6 +56,8 @@ categorizations:
   - id: "LGPL-3.0-or-later"
     categories: ["copyleft-limited"]
   - id: "MPL-2.0"
+    categories: ["copyleft-limited"]
+  - id: "EPL-1.0"
     categories: ["copyleft-limited"]
   - id: "EPL-2.0"
     categories: ["copyleft-limited"]
