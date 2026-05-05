@@ -1,0 +1,14 @@
+# Please see the documentation for all configuration options:
+# https://docs.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    cooldown:
+      default-days: 2 # Don't use new releases younger than two days - This is to mitigate the risk of supply chain attacks
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]
